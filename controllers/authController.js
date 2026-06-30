@@ -10,7 +10,6 @@ const validateUserInput = (name, email, password, role) => {
     return "Password must be at least 8 characters long.";
   }
 
-  // Standard structural email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return "Please provide a structurally valid email address.";
@@ -90,7 +89,6 @@ export const loginUser = async (req, res) => {
   }
 
   try {
-    // Query completely maps specific targeting fields
     const userResult = await pool.query(
       "SELECT id, name, email, password, role FROM users WHERE email = $1;",
       [email.trim().toLowerCase()],
