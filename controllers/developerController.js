@@ -170,7 +170,7 @@ export const updateDeveloper = async (req, res) => {
         const fieldMappings = {
             full_name: full_Name,
             email_address: email_address ? email_address.trim().toLowerCase() : undefined,
-            password: password ? await bcrypt.hash(password, 12) : undefined, // Securely re-hash if updated
+            password: password ? await bcrypt.hash(password, 12) : undefined, 
             your_domain: your_domain,
             tech_stack: Tech_stack,
             linkdin_url: Linkdin_URL,
