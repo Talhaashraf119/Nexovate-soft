@@ -21,7 +21,7 @@ export const createProjectWizard = async (
         RETURNING id;
     `;
   const values = [
-    userId,
+    client_id,
     title,
     JSON.stringify(basics),
     description,
