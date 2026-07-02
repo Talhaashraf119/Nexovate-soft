@@ -36,11 +36,15 @@ export const saveWizardData = async (req, res) => {
     projectId:project.id
 });
   } catch (error) {
+    console.error(error);
+
     return res.status(500).json({
-    success:false,
-    error:"Internal server error"
-});
-  }
+        success: false,
+        error: error.message,
+        stack: error.stack
+    });
+}
+
 };
 
 export const saveQuestionnaireData = async (req, res) => {
