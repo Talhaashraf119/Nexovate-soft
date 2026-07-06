@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import PDFDocument from 'pdfkit';
 import pool from '../config/database.js';
 // 1. Import the official Google Gen AI SDK
@@ -62,53 +60,73 @@ const callLLM = async (mcqAnswers, overview) => {
 }
 };
 
-const generatePdfFile = (scopeId, scopeText) => {
-    return new Promise((resolve, reject) => {
-        const doc = new PDFDocument();
-        const dir = './storage/pdfs';
-        
-        if (!fs.existsSync(dir)){
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        
-        const filePath = path.join(dir, `scope_${scopeId}.pdf`);
-        const writeStream = fs.createWriteStream(filePath);
+const generatePdfBuffer = (scopeText) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
 
-        doc.pipe(writeStream);
-        doc.fontSize(20).text('PROJECT SCOPE DOCUMENT', { align: 'center' });
-        doc.moveDown(2);
-        doc.fontSize(12).text(scopeText, { lineGap: 5 });
-        doc.end();
+    const chunks = [];
 
-        writeStream.on('finish', () => resolve(filePath));
-        writeStream.on('error', (err) => reject(err));
+    doc.on("data", (chunk) => chunks.push(chunk));
+
+    doc.on("end", () => {
+      resolve(Buffer.concat(chunks));
     });
+
+    doc.on("error", reject);
+
+    doc.fontSize(20).text("PROJECT SCOPE DOCUMENT", {
+      align: "center",
+    });
+
+    doc.moveDown(2);
+
+    doc.fontSize(12).text(scopeText, {
+      lineGap: 5,
+    });
+
+    doc.end();
+  });
 };
 
 export const processScopeGeneration = async (userId, questionnaireId) => {
-    const qCheck = await pool.query('SELECT * FROM questionnaires WHERE id = $1 AND user_id = $2', [questionnaireId, userId]);
+
+    const qCheck = await pool.query(
+        "SELECT * FROM questionnaires WHERE id = $1 AND user_id = $2",
+        [userId ? questionnaireId : questionnaireId, userId]
+    );
+
     if (qCheck.rows.length === 0) {
-        throw new Error('Questionnaire not found or access denied.');
+        throw new Error("Questionnaire not found or access denied.");
     }
 
     const questionnaire = qCheck.rows[0];
 
-    // Calls the real Gemini API here
-    const generatedText = await callLLM(questionnaire.mcq_answers, questionnaire.project_overview);
+    const generatedText = await callLLM(
+        questionnaire.mcq_answers,
+        questionnaire.project_overview
+    );
 
     const insertScopeQuery = `
-        INSERT INTO scopes (user_id, questionnaire_id, scope_text)
-        VALUES ($1, $2, $3) RETURNING id;
+        INSERT INTO scopes
+        (
+            user_id,
+            questionnaire_id,
+            scope_text
+        )
+        VALUES
+        ($1,$2,$3)
+        RETURNING *;
     `;
-    const scopeResult = await pool.query(insertScopeQuery, [userId, questionnaireId, generatedText]);
-    const scopeId = scopeResult.rows[0].id;
 
-    const pdfPath = await generatePdfFile(scopeId, generatedText);
+    const { rows } = await pool.query(
+        insertScopeQuery,
+        [
+            userId,
+            questionnaireId,
+            generatedText,
+        ]
+    );
 
-    const updateScopeQuery = `
-        UPDATE scopes SET pdf_path = $1 WHERE id = $2 RETURNING *;
-    `;
-    const { rows } = await pool.query(updateScopeQuery, [pdfPath, scopeId]);
     return rows[0];
 };
 
@@ -118,9 +136,15 @@ export const fetchScopeForUser = async (userId, scopeId) => {
     return rows[0];
 };
 const scopeService = {
+
     createQuestionnaire,
+
     processScopeGeneration,
-    fetchScopeForUser
+
+    fetchScopeForUser,
+
+    generatePdfBuffer,
+
 };
 
 export default scopeService;

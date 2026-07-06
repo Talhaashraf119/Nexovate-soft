@@ -18,19 +18,33 @@ export const saveQuestionnaire = async (req, res) => {
 };
 
 export const generateScope = async (req, res) => {
+
     try {
+
         const userId = req.user.id;
+
         const { questionnaireId } = req.body;
 
-        if (!questionnaireId) {
-            return res.status(400).json({ error: 'questionnaireId is required.' });
-        }
+        const scope = await scopeService.processScopeGeneration(
+            userId,
+            questionnaireId
+        );
 
-        const scope = await scopeService.processScopeGeneration(userId, questionnaireId);
-        return res.status(201).json({ message: 'Scope generated successfully', scope });
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return res.status(201).json({
+            message: "Scope generated successfully",
+            scope,
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            error: err.message,
+        });
+
     }
+
 };
 
 export const getScope = async (req, res) => {
@@ -50,18 +64,50 @@ export const getScope = async (req, res) => {
 };
 
 export const downloadScopePdf = async (req, res) => {
+
     try {
+
         const userId = req.user.id;
+
         const scopeId = req.params.id;
 
-        const scope = await scopeService.fetchScopeForUser(userId, scopeId);
-        if (!scope || !scope.pdf_path) {
-            return res.status(404).json({ error: 'PDF not found or unauthorized access.' });
+        const scope = await scopeService.fetchScopeForUser(
+            userId,
+            scopeId
+        );
+
+        if (!scope) {
+
+            return res.status(404).json({
+                error: "Scope not found."
+            });
+
         }
 
-        const absolutePath = path.resolve(scope.pdf_path);
-        return res.download(absolutePath, `Scope_Document_${scopeId}.pdf`);
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+        const pdfBuffer = await scopeService.generatePdfBuffer(
+            scope.scope_text
+        );
+
+        res.setHeader(
+            "Content-Type",
+            "application/pdf"
+        );
+
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="Scope_${scopeId}.pdf"`
+        );
+
+        return res.send(pdfBuffer);
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            error: err.message,
+        });
+
     }
+
 };
