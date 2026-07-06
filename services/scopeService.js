@@ -88,7 +88,7 @@ return JSON.parse(text);
 }
 };
 
-const generatePdfBuffer = (scopeText) => {
+const generatePdfBuffer = (scope) => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument();
 
@@ -102,55 +102,56 @@ const generatePdfBuffer = (scopeText) => {
 
     doc.on("error", reject);
 
+    // Title
     doc.fontSize(20)
-   .text("PROJECT SCOPE DOCUMENT", { align: "center" });
+      .text("PROJECT SCOPE DOCUMENT", {
+        align: "center",
+      });
 
-doc.moveDown();
+    doc.moveDown();
 
-doc.fontSize(16)
-   .text("Executive Summary");
+    // Executive Summary
+    doc.fontSize(16).text("Executive Summary");
 
-doc.fontSize(12)
-   .text(scope.executiveSummary);
+    doc.fontSize(12).text(scope.executiveSummary);
 
-doc.moveDown();
+    doc.moveDown();
 
-doc.fontSize(16)
-   .text("Deliverables");
+    // Deliverables
+    doc.fontSize(16).text("Deliverables");
 
-scope.deliverables.forEach(item => {
-    doc.text("• " + item);
-});
+    scope.deliverables.forEach(item => {
+      doc.text("• " + item);
+    });
 
-doc.moveDown();
+    doc.moveDown();
 
-doc.fontSize(16)
-   .text("Recommended Tech Stack");
+    // Tech Stack
+    doc.fontSize(16).text("Recommended Tech Stack");
 
-doc.text(`Frontend: ${scope.techStack.frontend}`);
-doc.text(`Backend: ${scope.techStack.backend}`);
-doc.text(`Database: ${scope.techStack.database}`);
+    doc.text(`Frontend: ${scope.techStack.frontend}`);
+    doc.text(`Backend: ${scope.techStack.backend}`);
+    doc.text(`Database: ${scope.techStack.database}`);
 
-doc.moveDown();
+    doc.moveDown();
 
-doc.fontSize(16)
-   .text("Timeline");
+    // Timeline
+    doc.fontSize(16).text("Timeline");
 
-doc.text(scope.timeline);
+    doc.text(scope.timeline);
 
-doc.moveDown();
+    doc.moveDown();
 
-doc.fontSize(16)
-   .text("Milestones");
+    // Milestones
+    doc.fontSize(16).text("Milestones");
 
-scope.milestones.forEach(item => {
-    doc.text("• " + item);
-});
+    scope.milestones.forEach(item => {
+      doc.text("• " + item);
+    });
 
     doc.end();
   });
 };
-
 export const processScopeGeneration = async (userId, questionnaireId) => {
 
     const qCheck = await pool.query(
@@ -189,6 +190,7 @@ export const processScopeGeneration = async (userId, questionnaireId) => {
         JSON.stringify(generatedScope),
     ]
 );
+rows[0].scope_text = JSON.parse(rows[0].scope_text);
 
 return rows[0];
 };
