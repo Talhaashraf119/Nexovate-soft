@@ -25,14 +25,19 @@ export const generateScope = async (req, res) => {
 
         const { questionnaireId } = req.body;
 
-        const scope = await scopeService.processScopeGeneration(
+        const generatedScope = await scopeService.processScopeGeneration(
             userId,
             questionnaireId
         );
 
-        return res.status(201).json({
-            message: "Scope generated successfully",
-            scope,
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Scope generated successfully.",
+
+            scope: generatedScope
+
         });
 
     } catch (err) {
@@ -40,7 +45,11 @@ export const generateScope = async (req, res) => {
         console.error(err);
 
         return res.status(500).json({
-            error: err.message,
+
+            success: false,
+
+            error: err.message
+
         });
 
     }
