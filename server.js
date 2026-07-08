@@ -13,15 +13,31 @@ dotenv.config({ quiet: true });
 const app = express();
 
 // Enable CORS
+// Enable CORS for localhost, main production, and all Vercel previews/deployments
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://nexovate-soft.vercel.app", // your frontend when deployed
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl, or Postman)
+      if (!origin) return callback(null, true);
+
+      const allowedPatterns = [
+        /^http:\/\/localhost:\d+$/, // Matches localhost on any port
+        /^https:\/\/nexovate-soft\.vercel\.app$/, // Your main domain
+        /\.vercel\.app$/, // Matches ANY Vercel deployment/preview URL
+      ];
+
+      const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
+
 
 app.use(express.json());
 
