@@ -7,6 +7,7 @@ import projectRoutes from "./routes/clientRoutes/projectRoutes.js";
 import developerRoutes from "./routes/developerRoutes/developerRoutes.js";
 import scopeRoutes from "./routes/clientRoutes/scopeRoutes.js";
 import wizardRoutes from "./routes/clientRoutes/wizardRoutes.js";
+import clientRoutes from "./routes/clientRoutes/clientRoutes.js";
 
 dotenv.config({ quiet: true });
 
@@ -40,6 +41,7 @@ app.use(express.json());
 
 app.use("/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/client", clientRoutes);
 app.use("/api/developers", developerRoutes);
 app.use("/api/ai", scopeRoutes);
 app.use("/api/ai", wizardRoutes);
