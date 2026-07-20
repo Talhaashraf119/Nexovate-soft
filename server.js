@@ -2,28 +2,25 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 
-import authRoutes from "./routes/authRoutes.js";
-import projectRoutes from "./routes/projectRoutes.js";
-import developerRoutes from "./routes/developerRoutes.js";
-import scopeRoutes from "./routes/scopeRoutes.js";
-import wizardRoutes from "./routes/wizardRoutes.js";
+import authRoutes from "./routes/authRoutes/authRoutes.js";
+import projectRoutes from "./routes/clientRoutes/projectRoutes.js";
+import developerRoutes from "./routes/developerRoutes/developerRoutes.js";
+import scopeRoutes from "./routes/clientRoutes/scopeRoutes.js";
+import wizardRoutes from "./routes/clientRoutes/wizardRoutes.js";
 
 dotenv.config({ quiet: true });
 
 const app = express();
 
-// Enable CORS
-// Enable CORS for localhost, main production, and all Vercel previews/deployments
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, or Postman)
       if (!origin) return callback(null, true);
 
       const allowedPatterns = [
-        /^http:\/\/localhost:\d+$/, // Matches localhost on any port
-        /^https:\/\/nexovate-soft\.vercel\.app$/, // Your main domain
-        /\.vercel\.app$/, // Matches ANY Vercel deployment/preview URL
+        /^http:\/\/localhost:\d+$/, 
+        /^https:\/\/nexovate-soft\.vercel\.app$/, 
+        /\.vercel\.app$/, 
       ];
 
       const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));

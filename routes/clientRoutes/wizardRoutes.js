@@ -1,7 +1,7 @@
 import express from 'express';
 
-import { authenticateToken } from '../middleware/auth.js'; 
-import { saveQuestionnaireData, saveWizardData } from '../controllers/wizardController.js';
+import { authenticateToken } from '../../middleware/auth.js'; 
+import { saveQuestionnaireData, saveWizardData } from '../../controllers/client/wizardController.js';
 
 const router = express.Router();
 

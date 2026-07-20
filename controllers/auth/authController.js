@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import pool from "../config/database.js";
+import pool from "../../config/database.js";
 
 const validateUserInput = (name, email, password, role) => {
   if (!name || !email || !password) {
@@ -20,61 +20,6 @@ const validateUserInput = (name, email, password, role) => {
     return "Invalid account role provided. Must be client, developer, or admin.";
   }
   return null;
-};
-export const registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
-
-  const validationError = validateUserInput(name, email, password, role);
-  if (validationError) {
-    return res.status(400).json({ success: false, message: validationError });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanRole = role ? role.trim().toLowerCase() : "client";
-
-  try {
-    const userExists = await pool.query(
-      "SELECT id FROM users WHERE email = $1;",
-      [cleanEmail],
-    );
-    if (userExists.rows.length > 0) {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "User with this email already exists.",
-        });
-    }
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    const insertQuery = `
-            INSERT INTO users (name, email, password, role) 
-            VALUES ($1, $2, $3, $4) 
-            RETURNING id, name, email, role, created_at;
-        `;
-    const newUser = await pool.query(insertQuery, [
-      name.trim(),
-      cleanEmail,
-      hashedPassword,
-      cleanRole,
-    ]);
-    return res.status(201).json({
-      success: true,
-      message: "User registered successfully.",
-      user: {
-        id: newUser.rows[0].id,
-        name: newUser.rows[0].name,
-        email: newUser.rows[0].email,
-        role: newUser.rows[0].role,
-      },
-    });
-  } catch (error) {
-    console.error("Registration Error:", error.message);
-    return res
-      .status(500)
-      .json({ success: false, message: "An internal server error occurred." });
-  }
 };
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;

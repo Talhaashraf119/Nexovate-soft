@@ -1,4 +1,4 @@
-import scopeService from'../services/scopeService.js';
+import scopeService from'../../services/scopeService.js';
 
 export const saveGeneratedScope = async (req, res) => {
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import { createDeveloper, getAllDeveloper, getDeveloperById, updateDeveloper } from '../controllers/developerController.js';
+import { createDeveloper,getAllDeveloper,getDeveloperById ,updateDeveloper } from '../../controllers/developer/developerController.js';
 
 const router = express.Router();
 
