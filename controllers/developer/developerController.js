@@ -28,7 +28,6 @@ const validateProfileInput = (body, isUpdate = false) => {
     return null;
 };
 
-// --- CREATE DEVELOPER (With Safe Dual-Table SQL Transaction) ---
 export const createDeveloper = async (req, res) => {
     const validationError = validateProfileInput(req.body, false);
     if (validationError) {
@@ -175,7 +174,6 @@ export const getDeveloperById = async (req, res) => {
     }
 };
 
-// --- UPDATE DEVELOPER (With Safe Dual-Table SQL Transaction) ---
 export const updateDeveloper = async (req, res) => {
     const developerId = req.params.id;
     if (isNaN(Number(developerId))) {

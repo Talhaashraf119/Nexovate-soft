@@ -143,27 +143,32 @@ export const applyToProject = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to process project application.' });
     }
 };
+
 export const createProject = async (req, res) => {
-    const { title, description, budget, scope_document, status } = req.body;
+    // budget has been removed; utilizing the clean new naming scheme
+    const { projectName, purpose, projectOverview, scope_document, status } = req.body;
     const clientId = req.user?.id; 
 
-    if (!title || !description || !budget) {
-        return res.status(400).json({ message: 'Title, description, and budget are required.' });
+    // Validate using your new atomic parameters
+    if (!projectName || !purpose || !projectOverview) {
+        return res.status(400).json({ 
+            message: 'Project name, purpose, and project overview description are required.' 
+        });
     }
 
-    const initialStatus = status || PROJECT_STATUS.DRAFT;
+    const initialStatus = status || 'draft';
 
     try {
         const queryText = `
-            INSERT INTO projects (title, description, budget, scope_document, status, client_id) 
+            INSERT INTO projects (projectName, purpose, projectOverview, scope_document, status, client_id) 
             VALUES ($1, $2, $3, $4, $5, $6) 
-            RETURNING id, title, description, budget, scope_document, status, client_id, created_at;
+            RETURNING id, projectName, purpose, projectOverview, scope_document, status, client_id, created_at;
         `;
         
         const newProject = await pool.query(queryText, [
-            title, 
-            description, 
-            budget, 
+            projectName, 
+            purpose,
+            projectOverview, 
             scope_document || null, 
             initialStatus, 
             clientId
@@ -223,7 +228,6 @@ export const getClientProjects = async (req, res) => {
     const clientId = req.user?.id;
 
     try {
-    
         const queryText = `
             SELECT 
                 p.id AS project_id,
@@ -231,6 +235,7 @@ export const getClientProjects = async (req, res) => {
                 p.status,
                 p.timeline,
                 COALESCE(p.progress_percentage, 0) AS progress_percentage,
+                p.milestone_note, -- Added this field to pull notes for the client dashboard
                 CASE 
                     WHEN p.budget IS NULL THEN 'Rs. 0'
                     WHEN p.budget LIKE 'Rs.%' THEN p.budget
