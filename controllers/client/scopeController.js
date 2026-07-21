@@ -5,13 +5,16 @@ import pool from '../../config/database.js';
 export const startProjectAndGenerateIds = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { projectName, purpose, projectOverview } = req.body;
+        // Added budget to destructured request body
+        const { projectName, purpose, projectOverview, budget } = req.body;
 
-        if (!projectName || !purpose || !projectOverview) {
-            return res.status(400).json({ error: 'projectName, purpose, and projectOverview are required.' });
+        // Added budget to required validation checks
+        if (!projectName || !purpose || !projectOverview || !budget) {
+            return res.status(400).json({ error: 'projectName, purpose, projectOverview, and budget are required.' });
         }
 
-        const internalData = await scopeService.createProjectAndQuestionnaire(userId, projectName, purpose, projectOverview);
+        // Passed budget into the service call
+        const internalData = await scopeService.createProjectAndQuestionnaire(userId, projectName, purpose, projectOverview, budget);
         
         return res.status(201).json({
             success: true,

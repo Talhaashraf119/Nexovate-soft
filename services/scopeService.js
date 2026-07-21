@@ -6,21 +6,27 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({});
 
-export const createProjectAndQuestionnaire = async (userId, projectName, purpose, projectOverview) => {
+export const createProjectAndQuestionnaire = async (userId, projectName, purpose, projectOverview, budget) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // 1. Insert Atomic Project Record
+        // 1. Insert Atomic Project Record with budget
         const projectQuery = `
-            INSERT INTO projects (client_id, projectName, purpose, projectOverview, status)
-            VALUES ($1, $2, $3, $4, 'draft') 
+            INSERT INTO projects (client_id, projectName, purpose, projectOverview, budget, status)
+            VALUES ($1, $2, $3, $4, $5, 'draft') 
             RETURNING id;
         `;
-        const projectResult = await client.query(projectQuery, [userId, projectName, purpose, projectOverview]);
+        const projectResult = await client.query(projectQuery, [
+            userId, 
+            projectName, 
+            purpose, 
+            projectOverview, 
+            budget
+        ]);
         const projectId = projectResult.rows[0].id;
 
-        // 2. Insert Linked Questionnaire Record
+        // 2. Insert Linked Questionnaire Record with metadata
         const questionnaireQuery = `
             INSERT INTO questionnaires (user_id, project_id, project_overview, mcq_answers)
             VALUES ($1, $2, $3, $4) 
@@ -30,7 +36,7 @@ export const createProjectAndQuestionnaire = async (userId, projectName, purpose
             userId, 
             projectId, 
             projectOverview, 
-            JSON.stringify({ purpose }) // Store purpose inside metadata safely
+            JSON.stringify({ purpose, budget }) // Save purpose & budget inside metadata
         ]);
         const questionnaireId = questionnaireResult.rows[0].id;
 

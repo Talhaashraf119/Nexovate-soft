@@ -145,30 +145,32 @@ export const applyToProject = async (req, res) => {
 };
 
 export const createProject = async (req, res) => {
-    // budget has been removed; utilizing the clean new naming scheme
-    const { projectName, purpose, projectOverview, scope_document, status } = req.body;
+    // Included budget back into the request destructuring
+    const { projectName, purpose, projectOverview, budget, scope_document, status } = req.body;
     const clientId = req.user?.id; 
 
-    // Validate using your new atomic parameters
-    if (!projectName || !purpose || !projectOverview) {
+    // Added budget check into mandatory validation
+    if (!projectName || !purpose || !projectOverview || !budget) {
         return res.status(400).json({ 
-            message: 'Project name, purpose, and project overview description are required.' 
+            message: 'Project name, purpose, project overview, and budget are required.' 
         });
     }
 
-    const initialStatus = status || 'draft';
+    // Enforce lowercase to match your PostgreSQL Enum type safely
+    const initialStatus = status ? status.toLowerCase() : 'draft';
 
     try {
         const queryText = `
-            INSERT INTO projects (projectName, purpose, projectOverview, scope_document, status, client_id) 
-            VALUES ($1, $2, $3, $4, $5, $6) 
-            RETURNING id, projectName, purpose, projectOverview, scope_document, status, client_id, created_at;
+            INSERT INTO projects (projectName, purpose, projectOverview, budget, scope_document, status, client_id) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            RETURNING id, projectName, purpose, projectOverview, budget, scope_document, status, client_id, created_at;
         `;
         
         const newProject = await pool.query(queryText, [
             projectName, 
             purpose,
             projectOverview, 
+            budget,
             scope_document || null, 
             initialStatus, 
             clientId
