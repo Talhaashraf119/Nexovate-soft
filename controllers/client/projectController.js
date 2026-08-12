@@ -189,13 +189,13 @@ export const createProject = async (req, res) => {
 export const getAvailableProjects = async (req, res) => {
     try {
         const queryText = `
-            SELECT id, title, description, budget, scope_document, status, client_id, created_at 
+            SELECT id, projectname, projectoverview, budget, scope_document, status, client_id, created_at 
             FROM projects 
             WHERE status = $1
             ORDER BY created_at DESC;
         `;
         
-        const projectsResult = await pool.query(queryText, [PROJECT_STATUS.OPEN]);
+        const projectsResult = await pool.query(queryText, [PROJECT_STATUS.DRAFT]);
         
         return res.status(200).json(projectsResult.rows);
     } catch (error) {

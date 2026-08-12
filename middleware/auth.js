@@ -16,3 +16,12 @@ import jwt from 'jsonwebtoken';
         next();
     });
 };
+
+export const requireAdmin = (request, response, next) => {
+    if (!request.user || request.user.role !== 'admin') {
+        return response.status(403).json({ 
+            message: 'Access denied. Admin privileges required.' 
+        });
+    }
+    next();
+};

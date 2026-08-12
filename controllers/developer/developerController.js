@@ -113,7 +113,8 @@ export const getAllDeveloper = async (req, res) => {
     try {
         const queryText = `
             SELECT id, full_name, email_address, your_domain, tech_stack, linkdin_url, github_url, role, created_at 
-            FROM developers 
+            FROM developers
+            WHERE is_enabled = TRUE
             ORDER BY id DESC;
         `;
         

@@ -3,10 +3,12 @@ import dotenv from "dotenv";
 import cors from "cors";
 
 import authRoutes from './routes/authRoutes/authRoutes.js';
+import adminRoutes from './routes/adminRoutes/adminRoutes.js';
 import projectRoutes from './routes/clientRoutes/projectRoutes.js';
 import clientRoutes from './routes/clientRoutes/clientRoutes.js';
 import developerRoutes from './routes/developerRoutes/developerRoutes.js';
 import scopeRoutes from './routes/clientRoutes/scopeRoutes.js'; 
+import escrowRoutes from './routes/paymentRoutes/escrowRoutes.js'; 
 
 dotenv.config({ quiet: true });
 
@@ -38,11 +40,14 @@ app.use(
 
 app.use(express.json());
 
+app.use('/admin', adminRoutes);
+app.use('/payment', escrowRoutes);
 app.use('/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/client', clientRoutes);
 app.use('/api/developers', developerRoutes);
 app.use('/api/ai', scopeRoutes); 
+
 
 const PORT = process.env.PORT || 5000;
 

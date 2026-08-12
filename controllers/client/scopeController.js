@@ -129,8 +129,47 @@ export const sendToDeveloper = async (req, res) => {
         if (!scopeId) return res.status(400).json({ error: "Scope ID is missing." });
 
         const report = await scopeService.transmitToDeveloper(userId, scopeId, developerDetails || {});
-        return res.status(200).json({ success: true, message: "Routed to developer system.", data: report });
+        
+        return res.status(200).json({ 
+            success: true, 
+            message: "Project opened for all developers.", 
+            data: report 
+        });
     } catch (err) {
         return res.status(500).json({ error: err.message });
+    }
+};
+// GET /api/scope/projects/open
+// Allows any logged-in developer to view all available projects
+export const getOpenProjects = async (req, res) => {
+    try {
+        const projects = await scopeService.getAllOpenProjects();
+        return res.status(200).json({ success: true, count: projects.length, projects });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// POST /api/scope/projects/:projectId/apply
+// Allows a developer to apply for a specific project
+export const applyForProject = async (req, res) => {
+    try {
+        const developerId = req.user.id;
+        const { projectId } = req.params;
+        const { coverLetter, bidAmount } = req.body;
+
+        if (!projectId) {
+            return res.status(400).json({ error: "Project ID is required." });
+        }
+
+        const application = await scopeService.applyToProject(developerId, projectId, coverLetter, bidAmount);
+        
+        return res.status(201).json({
+            success: true,
+            message: "Successfully applied to project.",
+            application
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
     }
 };

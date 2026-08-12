@@ -219,12 +219,79 @@ export const fetchScopeForUser = async (userId, scopeId) => {
 };
 
 export const transmitToDeveloper = async (userId, scopeId, developerDetails) => {
-    const query = "SELECT * FROM scopes WHERE id=$1 AND user_id=$2";
-    const { rows } = await pool.query(query, [scopeId, userId]);
-    if (!rows.length) throw new Error("Scope profile not found or unauthorized access.");
-    return { sent: true, developerDetails, pdf_url: rows[0].pdf_url };
+    // 1. Verify that the scope belongs to this client
+    const scopeQuery = "SELECT * FROM scopes WHERE id = $1 AND user_id = $2";
+    const { rows: scopeRows } = await pool.query(scopeQuery, [scopeId, userId]);
+
+    if (!scopeRows.length) {
+        throw new Error("Scope profile not found or unauthorized access.");
+    }
+
+    const scope = scopeRows[0];
+
+    // 2. Publish/Open the project so ALL developers can see it
+    const updateProjectQuery = `
+        UPDATE projects 
+        SET status = 'open' 
+        WHERE scope_id = $1 OR id = $1
+        RETURNING *;
+    `;
+    const { rows: projectRows } = await pool.query(updateProjectQuery, [scopeId]);
+
+    return { 
+        sent: true, 
+        message: "Project published successfully! It is now visible to all developers.",
+        project: projectRows[0] || null,
+        pdf_url: scope.pdf_url 
+    };
+};
+// Fetch all open projects for developers to browse
+export const getAllOpenProjects = async () => {
+    const query = `
+        SELECT 
+            p.id, 
+            p.projectName, 
+            p.purpose, 
+            p.projectOverview, 
+            p.budget, 
+            p.status, 
+            p.created_at,
+            u.id AS client_id,
+            u.name AS client_name
+        FROM projects p
+        LEFT JOIN users u ON p.client_id = u.id
+        WHERE p.status = 'draft' OR p.status = 'open'
+        ORDER BY p.created_at DESC;
+    `;
+    const { rows } = await pool.query(query);
+    return rows;
 };
 
+// Allow a developer to submit an application for a specific project
+export const applyToProject = async (developerId, projectId, coverLetter, bidAmount) => {
+    // Check if project exists
+    const projectCheck = await pool.query(`SELECT id FROM projects WHERE id = $1`, [projectId]);
+    if (!projectCheck.rows.length) {
+        throw new Error("Project not found.");
+    }
+
+    const insertQuery = `
+        INSERT INTO project_applications (project_id, developer_id, cover_letter, bid_amount)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (project_id, developer_id) 
+        DO UPDATE SET cover_letter = EXCLUDED.cover_letter, bid_amount = EXCLUDED.bid_amount, created_at = CURRENT_TIMESTAMP
+        RETURNING *;
+    `;
+
+    const { rows } = await pool.query(insertQuery, [
+        projectId, 
+        developerId, 
+        coverLetter || null, 
+        bidAmount || null
+    ]);
+
+    return rows[0];
+};
 const scopeService = {
     createProjectAndQuestionnaire,
     processScopeGeneration,
@@ -232,6 +299,8 @@ const scopeService = {
     saveScope,
     fetchScopeForUser,
     generatePdfBuffer,
-    transmitToDeveloper
+    transmitToDeveloper,
+    getAllOpenProjects,
+    applyToProject
 };
 export default scopeService;
