@@ -240,14 +240,13 @@ export const getClientProjects = async (req, res) => {
         const queryText = `
             SELECT 
                 p.id AS project_id,
-                p.title AS project_name,
+                p.projectname,
                 p.status,
 
                 COALESCE(p.progress_percentage, 0) AS progress_percentage,
 
                 CASE 
-                    WHEN p.budget IS NULL OR p.budget = '' THEN 'Rs. 0'
-                    WHEN p.budget::text LIKE 'Rs.%' THEN p.budget::text
+                    WHEN p.budget IS NULL THEN 'Rs. 0'
                     ELSE CONCAT('Rs. ', p.budget::text)
                 END AS budget,
 
