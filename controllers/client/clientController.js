@@ -117,7 +117,7 @@ export const updateClient = async (req, res) => {
     const existingClientRes = await dbClient.query("SELECT user_id FROM clients WHERE id = $1;", [clientId]);
     if (existingClientRes.rows.length === 0) {
       await dbClient.query('ROLLBACK');
-      return res.status(404).json({ success: false, message: `Client profile with ID ${clientId} not found.` });
+      return res.status(404).json({ success: false, message: `Client profile ID  not found.` });
     }
 
     const userId = existingClientRes.rows[0].user_id;

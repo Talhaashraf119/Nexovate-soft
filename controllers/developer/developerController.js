@@ -318,3 +318,133 @@ export const updateDeveloper = async (req, res) => {
         client.release();
     }
 };
+export const getDeveloperDashboard = async (req, res) => {
+
+    const developerId = req.user?.id;
+
+    if (!developerId) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized. Developer ID not found.'
+        });
+    }
+
+    try {
+
+        const statsQuery = `
+            SELECT
+                COUNT(DISTINCT p.id)::integer
+                    AS total_projects,
+
+                COUNT(
+                    DISTINCT CASE
+                        WHEN p.status = 'in_progress'
+                        THEN p.id
+                    END
+                )::integer AS active_projects,
+
+                COALESCE(
+                    (
+                        SELECT SUM(pay.amount)
+                        FROM payments pay
+                        WHERE pay.developer_id = $1
+                          AND pay.status = 'released'
+                    ),
+                    0
+                ) AS earned_money
+
+            FROM projects p
+
+            WHERE p.developer_id = $1;
+        `;
+
+        const projectsQuery = `
+            SELECT
+                p.id AS project_id,
+
+                p.projectname AS project_name,
+
+                p.status,
+
+                COALESCE(
+                    p.progress_percentage,
+                    0
+                )::integer AS progress_percentage,
+
+                COALESCE(
+                    p.timeline,
+                    'Not specified'
+                ) AS timeline,
+
+                CASE
+                    WHEN p.budget IS NULL
+                    THEN 'Rs. 0'
+
+                    ELSE CONCAT(
+                        'Rs. ',
+                        p.budget::text
+                    )
+                END AS budget,
+
+                p.created_at,
+                p.updated_at
+
+            FROM projects p
+
+            WHERE p.developer_id = $1
+
+            ORDER BY p.created_at DESC;
+        `;
+
+        const [
+            statsResult,
+            projectsResult
+        ] = await Promise.all([
+            pool.query(
+                statsQuery,
+                [developerId]
+            ),
+
+            pool.query(
+                projectsQuery,
+                [developerId]
+            )
+        ]);
+
+        const stats = statsResult.rows[0];
+
+        return res.status(200).json({
+            success: true,
+
+            message:
+                'Developer dashboard retrieved successfully.',
+
+            dashboard: {
+                total_projects:
+                    stats.total_projects,
+
+                active_projects:
+                    stats.active_projects,
+
+                earned_money:
+                    Number(stats.earned_money)
+            },
+
+            projects:
+                projectsResult.rows
+        });
+
+    } catch (error) {
+
+        console.error(
+            'Get Developer Dashboard Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                'Failed to retrieve developer dashboard.'
+        });
+    }
+};

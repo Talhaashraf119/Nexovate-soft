@@ -287,3 +287,165 @@ export const getClientProjects = async (req, res) => {
         });
     }
 };
+export const getClientProjectMilestoneReport = async (req, res) => {
+    const clientId = req.user?.id;
+    const { projectId } = req.params;
+
+    if (!clientId) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized. Client ID not found.'
+        });
+    }
+
+    if (!projectId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Project ID is required.'
+        });
+    }
+
+    // Validate project ID
+    const projectIdNumber = Number(projectId);
+
+    if (!Number.isInteger(projectIdNumber) || projectIdNumber <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid project ID.'
+        });
+    }
+
+    try {
+        const queryText = `
+            SELECT
+                p.id AS project_id,
+                p.projectname,
+                p.status,
+
+                COALESCE(p.timeline, 'Not specified') AS timeline,
+
+                CASE
+                    WHEN p.budget IS NULL THEN 'Rs. 0'
+                    ELSE CONCAT('Rs. ', p.budget::text)
+                END AS payment,
+
+                COALESCE(p.progress_percentage, 0) AS progress_percentage,
+
+                COALESCE(
+                    NULLIF(p.milestone_note, ''),
+                    'No milestone report available.'
+                ) AS milestone_note,
+
+                p.created_at,
+                p.updated_at,
+
+                u.name AS assigned_developer_name,
+                u.email AS assigned_developer_email
+
+            FROM projects p
+
+            LEFT JOIN users u
+                ON p.developer_id = u.id
+
+            WHERE p.id = $1
+              AND p.client_id = $2
+
+            LIMIT 1;
+        `;
+
+        const result = await pool.query(queryText, [
+            projectIdNumber,
+            clientId
+        ]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Project not found or you do not have access to this project.'
+            });
+        }
+
+        const project = result.rows[0];
+
+        return res.status(200).json({
+            success: true,
+            message: 'Milestone report retrieved successfully.',
+            report: {
+                project_id: project.project_id,
+                project_name: project.projectname,
+                status: project.status,
+
+                timeline: project.timeline,
+
+                payment: project.payment,
+
+                progress_percentage: project.progress_percentage,
+
+                milestone_note: project.milestone_note,
+
+                assigned_developer: {
+                    name: project.assigned_developer_name,
+                    email: project.assigned_developer_email
+                },
+
+                created_at: project.created_at,
+                updated_at: project.updated_at
+            }
+        });
+
+    } catch (error) {
+        console.error(
+            'Get Client Project Milestone Report Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve milestone report.'
+        });
+    }
+};
+export const assignDeveloperToProject = async (req, res) => {
+    try {
+        const { projectId } = req.params;
+
+        const { developer_id } = req.body;
+
+        if (!projectId) {
+            return res.status(400).json({
+                success: false,
+                message: "Project ID is required."
+            });
+        }
+
+        if (!developer_id) {
+            return res.status(400).json({
+                success: false,
+                message: "Developer ID is required."
+            });
+        }
+
+        const project =
+            await scopeService.assignDeveloperToProject(
+                Number(projectId),
+                Number(developer_id)
+            );
+
+        return res.status(200).json({
+            success: true,
+            message: "Developer assigned to project successfully.",
+            project
+        });
+
+    } catch (error) {
+        console.error(
+            "Assign Developer Error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
