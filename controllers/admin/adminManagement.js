@@ -1,9 +1,5 @@
 import pool from "../../config/database.js";
 
-/**
- * Admin: Delete a Developer profile and return deleted details
- * DELETE /admin/developers/:id
- */
 export const deleteDeveloper = async (req, res) => {
     const { id } = req.params;
 
@@ -58,10 +54,6 @@ export const deleteDeveloper = async (req, res) => {
     }
 };
 
-/**
- * Admin: Delete a Client profile and return deleted details
- * DELETE /admin/clients/:id
- */
 export const deleteClient = async (req, res) => {
     const { id } = req.params;
 
@@ -116,12 +108,6 @@ export const deleteClient = async (req, res) => {
         dbClient.release();
     }
 };
-
-/**
- * Admin: Verify or Unverify a Developer
- * PATCH /admin/developers/:id/verify
- * Body: { "is_verified": true } (or false)
- */
 export const verifyDeveloper = async (req, res) => {
     const { id } = req.params;
     const { is_verified } = req.body;
@@ -176,11 +162,7 @@ export const verifyDeveloper = async (req, res) => {
         });
     }
 };
-/**
- * Admin: Enable or Disable Developer Account
- * PATCH /admin/developers/:id/status
- * Body: { "is_enabled": false } (or true)
- */
+
 export const toggleDeveloperAccountStatus = async (req, res) => {
     const { id } = req.params;
     const { is_enabled } = req.body;

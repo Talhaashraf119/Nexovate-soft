@@ -1,4 +1,6 @@
 import express from "express";
+import { createServer } from 'http';
+
 import dotenv from "dotenv";
 import cors from "cors";
 
@@ -9,6 +11,8 @@ import clientRoutes from './routes/clientRoutes/clientRoutes.js';
 import developerRoutes from './routes/developerRoutes/developerRoutes.js';
 import scopeRoutes from './routes/clientRoutes/scopeRoutes.js'; 
 import escrowRoutes from './routes/paymentRoutes/escrowRoutes.js'; 
+import { initSocket } from './config/socket.js';
+
 
 dotenv.config({ quiet: true });
 
@@ -48,9 +52,11 @@ app.use('/api/client', clientRoutes);
 app.use('/api/developers', developerRoutes);
 app.use('/api/ai', scopeRoutes); 
 
+const httpServer = createServer(app);
+initSocket(httpServer);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+    console.log(`Server running safely on port ${PORT} with WebSockets enabled`);
 });

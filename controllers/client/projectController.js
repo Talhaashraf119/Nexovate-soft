@@ -229,25 +229,42 @@ export const getProjectById = async (req, res) => {
 export const getClientProjects = async (req, res) => {
     const clientId = req.user?.id;
 
+    if (!clientId) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized. Client ID not found.'
+        });
+    }
+
     try {
         const queryText = `
             SELECT 
                 p.id AS project_id,
-                p.title,
+                p.title AS project_name,
                 p.status,
-                p.timeline,
+
                 COALESCE(p.progress_percentage, 0) AS progress_percentage,
-                p.milestone_note, -- Added this field to pull notes for the client dashboard
+
                 CASE 
-                    WHEN p.budget IS NULL THEN 'Rs. 0'
-                    WHEN p.budget LIKE 'Rs.%' THEN p.budget
-                    ELSE CONCAT('Rs. ', p.budget)
-                END AS budget_in_rs,
+                    WHEN p.budget IS NULL OR p.budget = '' THEN 'Rs. 0'
+                    WHEN p.budget::text LIKE 'Rs.%' THEN p.budget::text
+                    ELSE CONCAT('Rs. ', p.budget::text)
+                END AS budget,
+
+                COALESCE(p.timeline, 'Not specified') AS timeline,
+
+                COALESCE(p.milestone_note, '') AS milestone_note,
+
                 u.name AS assigned_developer_name,
                 u.email AS assigned_developer_email
+
             FROM projects p
-            LEFT JOIN users u ON p.developer_id = u.id
+
+            LEFT JOIN users u 
+                ON p.developer_id = u.id
+
             WHERE p.client_id = $1
+
             ORDER BY p.created_at DESC;
         `;
 
@@ -258,12 +275,16 @@ export const getClientProjects = async (req, res) => {
             count: result.rows.length,
             projects: result.rows
         });
+
     } catch (error) {
-        console.error('Get Client Projects Dashboard Error:', error.message);
-        return res.status(500).json({ 
-            success: false, 
-            message: 'Failed to retrieve your projects dashboard view.' 
+        console.error(
+            'Get Client Projects Dashboard Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve your projects dashboard view.'
         });
     }
 };
-

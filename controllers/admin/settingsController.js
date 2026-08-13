@@ -1,10 +1,5 @@
 import pool from '../../config/database.js';
 
-/**
- * 6. Admin set platform commission percentage
- * PATCH /admin/settings/commission
- * Body: { "commission_percentage": 12.5 }
- */
 export const setPlatformCommission = async (req, res) => {
     const { commission_percentage } = req.body;
 
@@ -39,11 +34,6 @@ export const setPlatformCommission = async (req, res) => {
     }
 };
 
-/**
- * 7. Admin set minimum withdrawal amount
- * PATCH /admin/settings/min-withdrawal
- * Body: { "min_withdrawal_amount": 100.00 }
- */
 export const setMinWithdrawalAmount = async (req, res) => {
     const { min_withdrawal_amount } = req.body;
 
@@ -77,11 +67,6 @@ export const setMinWithdrawalAmount = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };
-
-/**
- * Get Platform Settings (Utility for Admin / System / Frontend)
- * GET /admin/settings
- */
 export const getPlatformSettings = async (req, res) => {
     try {
         const queryText = `SELECT key, value, updated_at FROM platform_settings;`;

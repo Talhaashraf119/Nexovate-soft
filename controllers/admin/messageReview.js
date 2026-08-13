@@ -1,8 +1,5 @@
 import pool from "../../config/database.js";
 
-/**
- * 1. Get overview of all project chats (for Admin Dashboard list)
- */
 export const getAllProjectChatSummaries = async (req, res) => {
     try {
         const queryText = `
@@ -28,16 +25,12 @@ export const getAllProjectChatSummaries = async (req, res) => {
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
-/**
- * 2. Get paginated chat history for a specific project (Admin Review)
- */
 export const getAdminProjectChatHistory = async (req, res) => {
     console.log("--> getAdminProjectChatHistory called!");
     console.log("--> req.params:", req.params);
     console.log("--> req.originalUrl:", req.originalUrl);
     const { projectId } = req.params;
 
-    // Safety guard: Prevent non-numeric values (like string paths) from going to PostgreSQL
     if (isNaN(projectId)) {
         return res.status(400).json({
             success: false,
