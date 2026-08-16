@@ -11,64 +11,164 @@ const PROJECT_STATUS = {
 };
 
 export const downloadProjectPDF = async (req, res) => {
-    const projectId = req.params.id;
+    const projectId = Number(req.params.id);
 
-    if (isNaN(Number(projectId))) {
-        return res.status(400).json({ success: false, message: "Invalid project ID format." });
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid project ID format."
+        });
     }
 
     try {
-        // Fetch the project details
-        const projectQuery = `SELECT title, scope_document, status FROM projects WHERE id = $1;`;
-        const projectResult = await pool.query(projectQuery, [projectId]);
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Find project -> questionnaire -> scope -> PDF
+        |--------------------------------------------------------------------------
+        */
 
-        if (projectResult.rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'Project not found.' });
-        }
+        const query = `
+            SELECT
+                p.id AS project_id,
+                p.projectname,
+                p.status,
 
-        const project = projectResult.rows[0];
+                q.id AS questionnaire_id,
 
-        // Security check: If project is in "draft" mode, developers shouldn't see it yet
-        if (project.status === 'draft') {
-            return res.status(403).json({ 
-                success: false, 
-                message: "Unauthorized. This project scope is currently in draft and not yet available to developers." 
+                s.id AS scope_id,
+                s.pdf_url,
+                s.pdf_public_id
+
+            FROM projects p
+
+            LEFT JOIN questionnaires q
+                ON q.project_id = p.id
+
+            LEFT JOIN scopes s
+                ON s.questionnaire_id = q.id
+
+            WHERE p.id = $1
+
+            ORDER BY s.id DESC
+
+            LIMIT 1;
+        `;
+
+        const result = await pool.query(query, [projectId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found."
             });
         }
 
-        const scopeId = project.scope_document;
-        if (!scopeId) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'No scope document has been linked to this project yet.' 
+        const project = result.rows[0];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Only published projects
+        |--------------------------------------------------------------------------
+        */
+
+        if (project.status === "draft") {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "This project scope is not available to developers yet."
             });
         }
 
-        // Fetch scope text directly from scopes table (bypassing ownership filter because it is an open project)
-        const scopeQuery = `SELECT scope_text FROM scopes WHERE id = $1;`;
-        const scopeResult = await pool.query(scopeQuery, [scopeId]);
 
-        if (scopeResult.rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'Scope data not found.' });
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Check PDF
+        |--------------------------------------------------------------------------
+        */
+
+        if (!project.pdf_url) {
+            return res.status(404).json({
+                success: false,
+                message:
+                    "PDF document is not available for this project."
+            });
         }
 
-        // Parse and generate
-        const scopeTextParsed = JSON.parse(scopeResult.rows[0].scope_text);
-        const pdfBuffer = await scopeService.generatePdfBuffer(scopeTextParsed);
 
-        const safeFileName = project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Download PDF from Cloudinary
+        |--------------------------------------------------------------------------
+        */
 
-        res.setHeader("Content-Type", "application/pdf");
+        const pdfResponse = await fetch(project.pdf_url);
+
+        if (!pdfResponse.ok) {
+            console.error(
+                "Cloudinary PDF fetch failed:",
+                pdfResponse.status,
+                pdfResponse.statusText
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: "Unable to retrieve PDF from storage."
+            });
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Convert response to Buffer
+        |--------------------------------------------------------------------------
+        */
+
+        const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+
+        const pdfBuffer = Buffer.from(pdfArrayBuffer);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Send PDF as download
+        |--------------------------------------------------------------------------
+        */
+
+        const safeFileName = project.projectname
+            .replace(/[^a-z0-9]/gi, "_")
+            .toLowerCase();
+
+        res.setHeader(
+            "Content-Type",
+            "application/pdf"
+        );
+
         res.setHeader(
             "Content-Disposition",
             `attachment; filename="Project_Scope_${safeFileName}.pdf"`
         );
 
+        res.setHeader(
+            "Content-Length",
+            pdfBuffer.length
+        );
+
+
         return res.send(pdfBuffer);
 
     } catch (error) {
-        console.error('Download Project PDF Error:', error.message);
-        return res.status(500).json({ success: false, message: 'Failed to generate project scope PDF.' });
+
+        console.error(
+            "Download Project PDF Error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                "Failed to download project scope PDF."
+        });
     }
 };
 export const applyToProject = async (req, res) => {
@@ -189,18 +289,41 @@ export const createProject = async (req, res) => {
 export const getAvailableProjects = async (req, res) => {
     try {
         const queryText = `
-            SELECT id, projectname, projectoverview, budget, scope_document, status, client_id, created_at 
+            SELECT 
+                id,
+                projectname,
+                projectoverview,
+                budget,
+                scope_document,
+                status,
+                client_id,
+                created_at 
             FROM projects 
             WHERE status = $1
             ORDER BY created_at DESC;
         `;
-        
-        const projectsResult = await pool.query(queryText, [PROJECT_STATUS.DRAFT]);
-        
-        return res.status(200).json(projectsResult.rows);
+
+        const projectsResult = await pool.query(
+            queryText,
+            [PROJECT_STATUS.OPEN]
+        );
+
+        return res.status(200).json({
+            success: true,
+            count: projectsResult.rows.length,
+            projects: projectsResult.rows
+        });
+
     } catch (error) {
-        console.error('Get Available Projects Error:', error.message);
-        return res.status(500).json({ message: 'Failed to retrieve available projects.' });
+        console.error(
+            'Get Available Projects Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve available projects.'
+        });
     }
 };
 

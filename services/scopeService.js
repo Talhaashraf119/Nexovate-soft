@@ -270,14 +270,14 @@ export const transmitToDeveloper = async (
   const scope = scopeRows[0];
 
   // 2. Publish/Open the project so ALL developers can see it
-  const updateProjectQuery = `
-        UPDATE projects 
-        SET 
-    status = 'open_to_developers',
-    updated_at = CURRENT_TIMESTAMP 
-        WHERE scope_id = $1 OR id = $1
-        RETURNING *;
-    `;
+const updateProjectQuery = `
+    UPDATE projects 
+    SET 
+        status = 'open_to_developers',
+        updated_at = CURRENT_TIMESTAMP 
+    WHERE questionnaire_id = $1
+    RETURNING *;
+`;
   const { rows: projectRows } = await pool.query(updateProjectQuery, [scopeId]);
 
   return {

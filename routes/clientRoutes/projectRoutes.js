@@ -26,10 +26,6 @@ router.get('/:id', authenticateToken, getProjectById);
 router.patch('/:id/apply', authenticateToken, applyToProject);
 router.get('/:id/download', authenticateToken, downloadProjectPDF);
 router.get('/:projectId/applicants', authenticateToken, getApplicantsForProject);
-router.patch(
-    '/:projectId/assign-developer',
-    authenticateToken,
-    assignDeveloperToProject
-);
+router.patch('/:projectId/assign-developer',authenticateToken,assignDeveloperToProject);
 
 export default router;

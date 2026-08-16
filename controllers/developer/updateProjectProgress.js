@@ -1,86 +1,271 @@
 import pool from '../../config/database.js';
 
 export const updateProgress = async (req, res) => {
-    const projectId = req.params.id;
-    const developerId = req.user?.id; // Authenticated developer's ID
-    const userRole = req.user?.role;  // Authenticated user's role
+    const projectId = Number(req.params.id);
+    const developerId = req.user?.id;
+    const userRole = req.user?.role;
 
-    const { progress_percentage, status, milestone_note } = req.body;
+    const {
+        progress_percentage,
+        status,
+        milestone
+    } = req.body;
 
-    // 1. Validation checks
+    // -----------------------------------------
+    // 1. AUTHORIZATION
+    // -----------------------------------------
+
     if (userRole !== 'developer') {
-        return res.status(403).json({ success: false, message: 'Access denied. Only registered developers can update project progress.' });
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. Only developers can update project progress.'
+        });
     }
 
-    if (isNaN(Number(projectId))) {
-        return res.status(400).json({ success: false, message: 'Invalid project ID format.' });
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid project ID format.'
+        });
     }
+
+    // -----------------------------------------
+    // 2. VALIDATE PROGRESS
+    // -----------------------------------------
+
+    let progress = undefined;
 
     if (progress_percentage !== undefined) {
-        const percent = Number(progress_percentage);
-        if (isNaN(percent) || percent < 0 || percent > 100) {
-            return res.status(400).json({ success: false, message: 'Progress percentage must be a number between 0 and 100.' });
+        progress = Number(progress_percentage);
+
+        if (
+            !Number.isFinite(progress) ||
+            progress < 0 ||
+            progress > 100
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Progress percentage must be between 0 and 100.'
+            });
         }
     }
 
-    try {
-        // 2. Fetch the project to verify assignment
-        const checkQuery = `SELECT developer_id FROM projects WHERE id = $1;`;
-        const checkResult = await pool.query(checkQuery, [projectId]);
+    // -----------------------------------------
+    // 3. VALIDATE MILESTONE
+    // -----------------------------------------
 
-        if (checkResult.rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'Project not found.' });
-        }
+    if (milestone !== undefined) {
 
-        // 3. Prevent unassigned developers from modifying the progress
-        if (checkResult.rows[0].developer_id !== developerId) {
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Access denied. You are not the assigned developer for this project.' 
+        if (!milestone || typeof milestone !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Milestone must be an object.'
             });
         }
 
-        // 4. Build the dynamic update query
-        const queryParts = [];
-        const values = [];
-        let placeholderIndex = 1;
-
-        if (progress_percentage !== undefined) {
-            queryParts.push(`progress_percentage = $${placeholderIndex++}`);
-            values.push(Number(progress_percentage));
-        }
-        if (status !== undefined) {
-            queryParts.push(`status = $${placeholderIndex++}`);
-            values.push(status.trim());
-        }
-        if (milestone_note !== undefined) {
-            queryParts.push(`milestone_note = $${placeholderIndex++}`);
-            values.push(milestone_note.trim() || null);
+        if (!milestone.title || !milestone.title.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Milestone title is required.'
+            });
         }
 
-        // If no fields were provided to update, throw a bad request
-        if (queryParts.length === 0) {
-            return res.status(400).json({ success: false, message: 'No fields provided for update (progress_percentage, status, or milestone_note required).' });
+        if (!milestone.description || !milestone.description.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Milestone description is required.'
+            });
         }
+    }
 
-        values.push(projectId);
-        const queryText = `
-            UPDATE projects 
-            SET ${queryParts.join(', ')}, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $${placeholderIndex}
-            RETURNING id, title, status, progress_percentage, milestone_note, updated_at;
+    // -----------------------------------------
+    // 4. FETCH PROJECT
+    // -----------------------------------------
+
+    try {
+
+        const projectQuery = `
+            SELECT
+                id,
+                projectname,
+                developer_id,
+                status,
+                progress_percentage,
+                milestones
+            FROM projects
+            WHERE id = $1
         `;
 
-        const result = await pool.query(queryText, values);
+        const projectResult = await pool.query(
+            projectQuery,
+            [projectId]
+        );
+
+        if (projectResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Project not found.'
+            });
+        }
+
+        const project = projectResult.rows[0];
+
+        // -----------------------------------------
+        // 5. CHECK ASSIGNED DEVELOPER
+        // -----------------------------------------
+
+        if (Number(project.developer_id) !== Number(developerId)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. You are not the assigned developer for this project.'
+            });
+        }
+
+        // -----------------------------------------
+        // 6. GET EXISTING MILESTONES
+        // -----------------------------------------
+
+        let milestones = project.milestones || [];
+
+        if (typeof milestones === 'string') {
+            milestones = JSON.parse(milestones);
+        }
+
+        if (!Array.isArray(milestones)) {
+            milestones = [];
+        }
+
+        // -----------------------------------------
+        // 7. ADD NEW MILESTONE
+        // -----------------------------------------
+
+        if (milestone !== undefined) {
+
+            const newMilestone = {
+                id: Date.now(),
+                title: milestone.title.trim(),
+                description: milestone.description.trim(),
+                progress:
+                    milestone.progress !== undefined
+                        ? Number(milestone.progress)
+                        : progress ?? project.progress_percentage ?? 0,
+
+                status:
+                    milestone.status?.trim() ||
+                    'in_progress',
+
+                created_at: new Date().toISOString()
+            };
+
+            milestones.push(newMilestone);
+        }
+
+        // -----------------------------------------
+        // 8. BUILD UPDATE
+        // -----------------------------------------
+
+        const updates = [];
+        const values = [];
+        let index = 1;
+
+        if (progress !== undefined) {
+            updates.push(
+                `progress_percentage = $${index}`
+            );
+
+            values.push(progress);
+            index++;
+        }
+
+        if (status !== undefined) {
+
+            const allowedStatuses = [
+                'in_progress',
+                'completed',
+                'open_to_developers'
+            ];
+
+            if (!allowedStatuses.includes(status.trim())) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`
+                });
+            }
+
+            updates.push(
+                `status = $${index}`
+            );
+
+            values.push(status.trim());
+            index++;
+        }
+
+        if (milestone !== undefined) {
+
+            updates.push(
+                `milestones = $${index}::jsonb`
+            );
+
+            values.push(JSON.stringify(milestones));
+            index++;
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nothing to update.'
+            });
+        }
+
+        // updated_at
+        updates.push(
+            'updated_at = CURRENT_TIMESTAMP'
+        );
+
+        values.push(projectId);
+
+        // -----------------------------------------
+        // 9. UPDATE PROJECT
+        // -----------------------------------------
+
+        const updateQuery = `
+            UPDATE projects
+            SET
+                ${updates.join(', ')}
+            WHERE id = $${index}
+            RETURNING
+                id,
+                projectname,
+                status,
+                progress_percentage,
+                milestones,
+                updated_at
+        `;
+
+        const result = await pool.query(
+            updateQuery,
+            values
+        );
 
         return res.status(200).json({
             success: true,
-            message: 'Project workspace progress updated successfully.',
+            message: milestone
+                ? 'Project progress and milestone updated successfully.'
+                : 'Project progress updated successfully.',
+
             project: result.rows[0]
         });
 
     } catch (error) {
-        console.error('Update Project Progress Error:', error.message);
-        return res.status(500).json({ success: false, message: 'Internal server error while saving project progress.' });
+
+        console.error(
+            'Update Project Progress Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error while updating project progress.'
+        });
     }
 };

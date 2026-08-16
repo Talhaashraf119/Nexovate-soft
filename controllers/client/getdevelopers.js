@@ -1,4 +1,3 @@
-// GET /api/scope/projects/:projectId/applicants
 
 import projectApplications from "../../services/developersApply.js";
 
