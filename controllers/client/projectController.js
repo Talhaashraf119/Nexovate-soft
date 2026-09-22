@@ -375,7 +375,7 @@ export const getClientProjects = async (req, res) => {
 
                 COALESCE(p.timeline, 'Not specified') AS timeline,
 
-                COALESCE(p.milestone_note, '') AS milestone_note,
+                COALESCE(p.milestones::text, '') AS milestones,
 
                 u.name AS assigned_developer_name,
                 u.email AS assigned_developer_email
@@ -406,7 +406,7 @@ export const getClientProjects = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: 'Failed to retrieve your projects dashboard view.'
+            message: error.message
         });
     }
 };
