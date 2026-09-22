@@ -257,11 +257,28 @@ export const fetchScopeForUser = async (userId, scopeId) => {
 export const transmitToDeveloper = async (
   userId,
   scopeId,
-  developerDetails,
+  developerDetails = {}
 ) => {
-  // 1. Verify that the scope belongs to this client
-  const scopeQuery = "SELECT * FROM scopes WHERE id = $1 AND user_id = $2";
-  const { rows: scopeRows } = await pool.query(scopeQuery, [scopeId, userId]);
+  // 1. Find the scope and verify that it belongs to this client
+  const scopeQuery = `
+    SELECT
+      s.id,
+      s.user_id,
+      s.questionnaire_id,
+      s.pdf_url,
+      q.project_id
+    FROM scopes s
+    INNER JOIN questionnaires q
+      ON q.id = s.questionnaire_id
+    WHERE s.id = $1
+      AND s.user_id = $2
+    LIMIT 1;
+  `;
+
+  const { rows: scopeRows } = await pool.query(scopeQuery, [
+    scopeId,
+    userId,
+  ]);
 
   if (!scopeRows.length) {
     throw new Error("Scope profile not found or unauthorized access.");
@@ -269,22 +286,36 @@ export const transmitToDeveloper = async (
 
   const scope = scopeRows[0];
 
-  // 2. Publish/Open the project so ALL developers can see it
-const updateProjectQuery = `
-    UPDATE projects 
-    SET 
-        status = 'open_to_developers',
-        updated_at = CURRENT_TIMESTAMP 
-    WHERE questionnaire_id = $1
+  // 2. Make sure the questionnaire is connected to a project
+  if (!scope.project_id) {
+    throw new Error("No project is linked to this scope.");
+  }
+
+  // 3. Open the correct project for all developers
+  const updateProjectQuery = `
+    UPDATE projects
+    SET
+      status = 'open_to_developers',
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+      AND client_id = $2
     RETURNING *;
-`;
-  const { rows: projectRows } = await pool.query(updateProjectQuery, [scopeId]);
+  `;
+
+  const { rows: projectRows } = await pool.query(updateProjectQuery, [
+    scope.project_id,
+    userId,
+  ]);
+
+  if (!projectRows.length) {
+    throw new Error("Project not found or unauthorized access.");
+  }
 
   return {
     sent: true,
     message:
       "Project published successfully! It is now visible to all developers.",
-    project: projectRows[0] || null,
+    project: projectRows[0],
     pdf_url: scope.pdf_url,
   };
 };
