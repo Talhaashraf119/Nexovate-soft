@@ -295,7 +295,7 @@ export const transmitToDeveloper = async (
   const updateProjectQuery = `
     UPDATE projects
     SET
-      status = 'open_to_developers',
+      status = 'draft',
       updated_at = CURRENT_TIMESTAMP
     WHERE id = $1
       AND client_id = $2
