@@ -96,30 +96,109 @@ export const downloadScopePdf = async (req, res) => {
     try {
         const userId = req.user.id;
         const userRole = req.user?.role;
-        const scopeId = req.params.id;
-        let scopeText = null;
+        const projectId = Number(req.params.id);
 
-        if (userRole === 'developer') {
-            const scopeResult = await pool.query(`SELECT scope_text FROM scopes WHERE id = $1;`, [scopeId]);
-            if (scopeResult.rows.length === 0) return res.status(404).json({ error: "Scope data not found." });
-            scopeText = scopeResult.rows[0].scope_text;
-        } else {
-            const scope = await scopeService.fetchScopeForUser(userId, scopeId);
-            if (!scope) return res.status(403).json({ error: "Access denied." });
-            scopeText = scope.scope_text;
+        if (!projectId) {
+            return res.status(400).json({
+                error: "Invalid project ID."
+            });
         }
 
-        const scopeTextParsed = typeof scopeText === 'string' ? JSON.parse(scopeText) : scopeText;
-        const pdfBuffer = await scopeService.generatePdfBuffer(scopeTextParsed);
+        let scopeText = null;
+
+        /*
+         * CLIENT
+         *
+         * Project → Questionnaire → Scope
+         */
+        if (userRole === 'client') {
+
+            const result = await pool.query(`
+                SELECT s.scope_text
+                FROM projects p
+                JOIN questionnaires q
+                    ON q.project_id = p.id
+                JOIN scopes s
+                    ON s.questionnaire_id = q.id
+                WHERE p.id = $1
+                  AND p.client_id = $2
+                LIMIT 1;
+            `, [projectId, userId]);
+
+            if (result.rows.length === 0) {
+                return res.status(403).json({
+                    error: "Access denied or scope document not found."
+                });
+            }
+
+            scopeText = result.rows[0].scope_text;
+        }
+
+        /*
+         * DEVELOPER
+         *
+         * Only allow the developer assigned to this project.
+         */
+        else if (userRole === 'developer') {
+
+            const result = await pool.query(`
+                SELECT s.scope_text
+                FROM projects p
+                JOIN questionnaires q
+                    ON q.project_id = p.id
+                JOIN scopes s
+                    ON s.questionnaire_id = q.id
+                WHERE p.id = $1
+                  AND p.developer_id = $2
+                LIMIT 1;
+            `, [projectId, userId]);
+
+            if (result.rows.length === 0) {
+                return res.status(403).json({
+                    error: "Access denied or scope document not found."
+                });
+            }
+
+            scopeText = result.rows[0].scope_text;
+        }
+
+        else {
+            return res.status(403).json({
+                error: "You are not authorized to download this document."
+            });
+        }
+
+        if (!scopeText) {
+            return res.status(404).json({
+                error: "Scope document not found."
+            });
+        }
+
+        const scopeTextParsed =
+            typeof scopeText === 'string'
+                ? JSON.parse(scopeText)
+                : scopeText;
+
+        const pdfBuffer =
+            await scopeService.generatePdfBuffer(scopeTextParsed);
 
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="Scope_${scopeId}.pdf"`);
+
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="Project_Scope_${projectId}.pdf"`
+        );
+
         return res.send(pdfBuffer);
+
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        console.error("Download Scope PDF Error:", err);
+
+        return res.status(500).json({
+            error: err.message
+        });
     }
 };
-
 // 7. ROUTE TO DEVELOPER SYSTEM
 export const sendToDeveloper = async (req, res) => {
     try {
