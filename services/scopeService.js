@@ -386,19 +386,17 @@ export const getAllOpenProjects = async (developerId) => {
         u.id AS client_id,
         u.name AS client_name,
 
-        CASE
-            WHEN pa.id IS NOT NULL THEN true
-            ELSE false
-        END AS has_applied
+        EXISTS (
+            SELECT 1
+            FROM project_applications pa
+            WHERE pa.project_id = p.id
+              AND pa.developer_id = $1
+        ) AS has_applied
 
     FROM projects p
 
     LEFT JOIN users u
         ON p.client_id = u.id
-
-    LEFT JOIN project_applications pa
-        ON pa.project_id = p.id
-        AND pa.developer_id = $1
 
     WHERE p.status = 'open_to_developers'
 
