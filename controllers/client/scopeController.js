@@ -221,12 +221,32 @@ export const sendToDeveloper = async (req, res) => {
 // GET /api/scope/projects/open
 // Allows any logged-in developer to view all available projects
 export const getOpenProjects = async (req, res) => {
-    try {
-        const projects = await scopeService.getAllOpenProjects();
-        return res.status(200).json({ success: true, count: projects.length, projects });
-    } catch (err) {
-        return res.status(500).json({ success: false, error: err.message });
+  try {
+    const developerId = req.user?.id;
+
+    if (!developerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized. Please login as a developer."
+      });
     }
+
+    const projects = await scopeService.getAllOpenProjects(developerId);
+
+    return res.status(200).json({
+      success: true,
+      count: projects.length,
+      projects
+    });
+
+  } catch (err) {
+    console.error("Get Open Projects Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 };
 
 // POST /api/scope/projects/:projectId/apply

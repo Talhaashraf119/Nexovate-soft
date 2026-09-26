@@ -371,34 +371,41 @@ export const transmitToDeveloper = async (
   };
 };
 // Fetch all open projects for developers to browse
-export const getAllOpenProjects = async () => {
+export const getAllOpenProjects = async (developerId) => {
   const query = `
-        SELECT 
-            p.id,
-            p.projectname,
-            p.purpose,
-            p.projectoverview,
-            p.budget,
-            p.status,
-            p.created_at,
+    SELECT 
+        p.id,
+        p.projectname,
+        p.purpose,
+        p.projectoverview,
+        p.budget,
+        p.status,
+        p.timeline,
+        p.created_at,
 
-            u.id AS client_id,
-            u.name AS client_name
+        u.id AS client_id,
+        u.name AS client_name,
 
-        FROM projects p
+        CASE
+            WHEN pa.id IS NOT NULL THEN true
+            ELSE false
+        END AS has_applied
 
-        LEFT JOIN users u
-            ON p.client_id = u.id
+    FROM projects p
 
-        WHERE p.status IN (
-            'draft',
-            'open_to_developers'
-        )
+    LEFT JOIN users u
+        ON p.client_id = u.id
 
-        ORDER BY p.created_at DESC;
-    `;
+    LEFT JOIN project_applications pa
+        ON pa.project_id = p.id
+        AND pa.developer_id = $1
 
-  const { rows } = await pool.query(query);
+    WHERE p.status = 'open_to_developers'
+
+    ORDER BY p.created_at DESC;
+  `;
+
+  const { rows } = await pool.query(query, [developerId]);
 
   return rows;
 };
