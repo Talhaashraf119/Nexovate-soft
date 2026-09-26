@@ -522,7 +522,7 @@ export const assignDeveloperToProject = async (
         await client.query(
             `
             UPDATE project_applications
-            SET application_status = 'accepted'
+            SET status = 'accepted'
             WHERE project_id = $1
               AND developer_id = $2
             `,
@@ -534,10 +534,10 @@ export const assignDeveloperToProject = async (
         await client.query(
             `
             UPDATE project_applications
-            SET application_status = 'rejected'
+            SET status = 'rejected'
             WHERE project_id = $1
               AND developer_id != $2
-              AND application_status = 'pending'
+              AND status = 'pending'
             `,
             [projectId, developerId]
         );
