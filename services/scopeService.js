@@ -57,7 +57,12 @@ const projectResult = await client.query(projectQuery, [
       userId,
       projectId,
       projectOverview,
-      JSON.stringify({ purpose, budget }), // Save purpose & budget inside metadata
+      JSON.stringify({
+    purpose,
+    budget,
+    timeline,
+    milestones
+}) // Save purpose & budget inside metadata
     ]);
     const questionnaireId = questionnaireResult.rows[0].id;
 

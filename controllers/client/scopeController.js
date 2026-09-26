@@ -5,24 +5,46 @@ import pool from '../../config/database.js';
 export const startProjectAndGenerateIds = async (req, res) => {
     try {
         const userId = req.user.id;
-        // Added budget to destructured request body
-        const { projectName, purpose, projectOverview, budget } = req.body;
 
-        // Added budget to required validation checks
+        const {
+            projectName,
+            purpose,
+            projectOverview,
+            budget,
+            timeline,
+            milestones = [],
+            total_milestones
+        } = req.body;
+
         if (!projectName || !purpose || !projectOverview || !budget) {
-            return res.status(400).json({ error: 'projectName, purpose, projectOverview, and budget are required.' });
+            return res.status(400).json({
+                error: 'projectName, purpose, projectOverview, and budget are required.'
+            });
         }
 
-        // Passed budget into the service call
-        const internalData = await scopeService.createProjectAndQuestionnaire(userId, projectName, purpose, projectOverview, budget);
-        
+        const internalData =
+            await scopeService.createProjectAndQuestionnaire(
+                userId,
+                projectName,
+                purpose,
+                projectOverview,
+                budget,
+                timeline,
+                milestones
+            );
+
         return res.status(201).json({
             success: true,
             message: 'Project and questionnaire created atomically.',
             ...internalData
         });
+
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        console.error('Start Project Error:', error);
+
+        return res.status(500).json({
+            error: error.message
+        });
     }
 };
 
