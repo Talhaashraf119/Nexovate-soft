@@ -4,7 +4,9 @@ import PDFDocument from "pdfkit";
 import pool from "../config/database.js";
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+});
 
 export const createProjectAndQuestionnaire = async (
   userId,
@@ -58,63 +60,113 @@ export const createProjectAndQuestionnaire = async (
 };
 
 const callLLM = async (overview, purpose, feedback = "") => {
-  try {
-    let feedbackPrompt = "";
-    if (feedback && feedback.trim() !== "") {
-      feedbackPrompt = `
-\nCRITICAL: The client wants to regenerate this scope with the following structural feedback/modifications:
+    try {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is not configured.");
+        }
+
+        let feedbackPrompt = "";
+
+        if (feedback && feedback.trim() !== "") {
+            feedbackPrompt = `
+CRITICAL: The client wants to regenerate this scope with the following structural feedback/modifications:
+
 "${feedback}"
-Modify the output payload layout, features, or stack explicitly to address this input request.`;
-    }
 
-    const prompt = `
+Modify the output payload layout, features, or stack explicitly to address this input request.
+`;
+        }
+
+        const prompt = `
 You are a Senior Software Architect and Project Manager.
-Based on the following project details, return ONLY valid JSON.${feedbackPrompt}
 
-Project Purpose: ${purpose}
+Based on the following project details, return ONLY valid JSON.
+
+${feedbackPrompt}
+
+Project Purpose:
+${purpose}
+
 Project Overview/Description:
 ${overview}
 
 Return the response in this exact format:
+
 {
   "executiveSummary": "",
-  "deliverables": [ "" ],
+  "deliverables": [],
   "techStack": {
     "frontend": "",
     "backend": "",
     "database": ""
   },
   "timeline": "",
-  "milestones": [ "" ]
+  "milestones": []
 }
 
 Rules:
-1. Return ONLY JSON. Do NOT use Markdown or \`\`\`json blocks.
-2. Recommend the most suitable modern technology stack based on the purpose.
-3. Keep the executive summary under 150 words.
-4. Deliverables and milestones must be structured cleanly.
+
+1. Return ONLY JSON.
+2. Do NOT use Markdown.
+3. Do NOT use \`\`\`json.
+4. Recommend the most suitable modern technology stack based on the project purpose.
+5. Keep the executive summary under 150 words.
+6. Deliverables must be an array of strings.
+7. Milestones must be an array of strings.
+8. Timeline must be a string.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-    });
+        console.log("Calling Gemini AI...");
 
-    let text = response.text.trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      text = jsonMatch[0].trim();
-    } else {
-      throw new Error(
-        "AI response did not contain a valid JSON object structure.",
-      );
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+        });
+
+        const rawText = response.text;
+
+        console.log("Gemini response received.");
+
+        if (!rawText) {
+            throw new Error("Gemini returned an empty response.");
+        }
+
+        let text = rawText.trim();
+
+        console.log("Gemini raw response:", text);
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+        if (!jsonMatch) {
+            throw new Error(
+                "AI response did not contain a valid JSON object."
+            );
+        }
+
+        text = jsonMatch[0].trim();
+
+        try {
+            const parsed = JSON.parse(text);
+
+            return parsed;
+
+        } catch (parseError) {
+            console.error("Gemini JSON parsing failed.");
+            console.error("Returned text:", text);
+
+            throw new Error(
+                "Gemini returned invalid JSON."
+            );
+        }
+
+    } catch (error) {
+        console.error("Gemini AI Generation Error:");
+        console.error(error);
+
+        throw new Error(
+            error.message || "Failed to generate scope document via AI."
+        );
     }
-
-    return JSON.parse(text);
-  } catch (error) {
-    console.error("Gemini AI Generation Error:", error);
-    throw new Error("Failed to generate scope document via AI.");
-  }
 };
 
 export const processScopeGeneration = async (userId, questionnaireId) => {
