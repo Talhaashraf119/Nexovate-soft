@@ -479,7 +479,7 @@ export const assignDeveloperToProject = async (
                 developer_id,
                 bid_amount,
                 cover_letter,
-                application_status
+                status
             FROM project_applications
             WHERE project_id = $1
               AND developer_id = $2
