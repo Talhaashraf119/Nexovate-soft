@@ -13,6 +13,8 @@ export const createProjectAndQuestionnaire = async (
   purpose,
   projectOverview,
   budget,
+  timeline,
+  milestones = [],
 ) => {
   const client = await pool.connect();
   try {
@@ -20,17 +22,29 @@ export const createProjectAndQuestionnaire = async (
 
     // 1. Insert Atomic Project Record with budget
     const projectQuery = `
-            INSERT INTO projects (client_id, projectName, purpose, projectOverview, budget, status)
-            VALUES ($1, $2, $3, $4, $5, 'draft') 
-            RETURNING id;
-        `;
-    const projectResult = await client.query(projectQuery, [
-      userId,
-      projectName,
-      purpose,
-      projectOverview,
-      budget,
-    ]);
+    INSERT INTO projects (
+        client_id,
+        projectName,
+        purpose,
+        projectOverview,
+        budget,
+        timeline,
+        milestones,
+        status
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+    RETURNING id;
+`;
+
+const projectResult = await client.query(projectQuery, [
+    userId,
+    projectName,
+    purpose,
+    projectOverview,
+    budget,
+    timeline || null,
+    JSON.stringify(milestones || []),
+]);
     const projectId = projectResult.rows[0].id;
 
     // 2. Insert Linked Questionnaire Record with metadata
