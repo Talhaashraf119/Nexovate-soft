@@ -445,82 +445,113 @@ export const assignDeveloperToProject = async (
     projectId,
     developerId
 ) => {
+    const client = await pool.connect();
 
-    // 1. Check that the project exists
-    const projectCheck = await pool.query(
-        `
-        SELECT
-            id,
-            client_id,
-            developer_id,
-            status
-        FROM projects
-        WHERE id = $1
-        `,
-        [projectId]
-    );
+    try {
+        await client.query("BEGIN");
 
-    if (!projectCheck.rows.length) {
-        throw new Error("Project not found.");
-    }
-
-    const project = projectCheck.rows[0];
-
-    // 2. Check that this developer actually applied
-    const applicationCheck = await pool.query(
-        `
-        SELECT
-            id,
-            project_id,
-            developer_id,
-            bid_amount,
-            cover_letter
-        FROM project_applications
-        WHERE project_id = $1
-          AND developer_id = $2
-        LIMIT 1
-        `,
-        [
-            projectId,
-            developerId
-        ]
-    );
-
-    if (!applicationCheck.rows.length) {
-        throw new Error(
-            "This developer has not applied for this project."
+        // 1. Check that the project exists
+        const projectCheck = await client.query(
+            `
+            SELECT
+                id,
+                client_id,
+                developer_id,
+                status
+            FROM projects
+            WHERE id = $1
+            `,
+            [projectId]
         );
+
+        if (!projectCheck.rows.length) {
+            throw new Error("Project not found.");
+        }
+
+        const project = projectCheck.rows[0];
+
+        // 2. Check that this developer actually applied
+        const applicationCheck = await client.query(
+            `
+            SELECT
+                id,
+                project_id,
+                developer_id,
+                bid_amount,
+                cover_letter,
+                application_status
+            FROM project_applications
+            WHERE project_id = $1
+              AND developer_id = $2
+            LIMIT 1
+            `,
+            [projectId, developerId]
+        );
+
+        if (!applicationCheck.rows.length) {
+            throw new Error(
+                "This developer has not applied for this project."
+            );
+        }
+
+        // 3. Assign developer to project
+        const updateProjectQuery = `
+            UPDATE projects
+            SET
+                developer_id = $1,
+                status = 'in_progress',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+            RETURNING
+                id,
+                projectname,
+                developer_id,
+                status,
+                progress_percentage,
+                budget,
+                timeline,
+                updated_at;
+        `;
+
+        const { rows } = await client.query(
+            updateProjectQuery,
+            [developerId, projectId]
+        );
+
+        // 4. Mark the selected developer's application as accepted
+        await client.query(
+            `
+            UPDATE project_applications
+            SET application_status = 'accepted'
+            WHERE project_id = $1
+              AND developer_id = $2
+            `,
+            [projectId, developerId]
+        );
+
+        // 5. Optional but recommended:
+        // Mark all other pending applications for this project as rejected
+        await client.query(
+            `
+            UPDATE project_applications
+            SET application_status = 'rejected'
+            WHERE project_id = $1
+              AND developer_id != $2
+              AND application_status = 'pending'
+            `,
+            [projectId, developerId]
+        );
+
+        await client.query("COMMIT");
+
+        return rows[0];
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
-
-    // 3. Assign developer to project
-    const updateQuery = `
-        UPDATE projects
-        SET
-            developer_id = $1,
-            status = 'in_progress',
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-
-        RETURNING
-            id,
-            projectname,
-            developer_id,
-            status,
-            progress_percentage,
-            budget,
-            timeline,
-            updated_at;
-    `;
-
-    const { rows } = await pool.query(
-        updateQuery,
-        [
-            developerId,
-            projectId
-        ]
-    );
-
-    return rows[0];
 };
 
 const scopeService = {
