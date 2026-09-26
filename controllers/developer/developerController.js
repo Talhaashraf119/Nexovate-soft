@@ -505,54 +505,44 @@ export const getDeveloperProjects = async (req, res) => {
 
   try {
     const query = `
-            SELECT
-                p.id AS project_id,
+    SELECT
+        p.id AS project_id,
+        p.projectname AS project_name,
+        p.status,
 
-                p.projectname AS project_name,
+        COALESCE(
+            p.progress_percentage,
+            0
+        )::integer AS progress_percentage,
 
-                p.status,
+        p.budget AS budget,
 
-                COALESCE(
-                    p.progress_percentage,
-                    0
-                )::integer AS progress_percentage,
+        COALESCE(
+            p.timeline,
+            'Not specified'
+        ) AS timeline,
 
-                CASE
-                    WHEN p.budget IS NULL
-                    THEN 'Rs. 0'
-                    ELSE CONCAT(
-                        'Rs. ',
-                        p.budget::text
-                    )
-                END AS budget,
+        u.id AS customer_id,
 
-                COALESCE(
-                    p.timeline,
-                    'Not specified'
-                ) AS timeline,
+        COALESCE(
+            u.name,
+            'Unknown Customer'
+        ) AS customer_name,
 
-                u.id AS customer_id,
+        u.email AS customer_email,
 
-                COALESCE(
-                    u.name,
-                    'Unknown Customer'
-                ) AS customer_name,
+        p.created_at,
+        p.updated_at
 
-                u.email AS customer_email,
+    FROM projects p
 
-                p.created_at,
-                p.updated_at
+    LEFT JOIN users u
+        ON p.client_id = u.id
 
-            FROM projects p
+    WHERE p.developer_id = $1
 
-            LEFT JOIN users u
-                ON p.client_id = u.id
-
-            WHERE p.developer_id = $1
-
-            ORDER BY p.created_at DESC;
-        `;
-
+    ORDER BY p.created_at DESC;
+`;
     const result = await pool.query(query, [developerId]);
 
     return res.status(200).json({
