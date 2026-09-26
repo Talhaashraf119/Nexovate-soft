@@ -212,3 +212,49 @@ export const getAdminProjectDetails = async (req, res) => {
         });
     }
 };
+export const approveAdminProject = async (req, res) => {
+    const { id } = req.params;
+
+    if (!id || isNaN(Number(id))) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid project ID."
+        });
+    }
+
+    const projectId = Number(id);
+
+    try {
+        const query = `
+            UPDATE projects
+            SET
+                status = 'open_to_developers',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+            RETURNING id, projectname, status, updated_at;
+        `;
+
+        const result = await pool.query(query, [projectId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Project approved and opened for developers successfully.",
+            project: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error("Admin Approve Project Error:", error.message);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error while approving project."
+        });
+    }
+};

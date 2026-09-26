@@ -1,7 +1,8 @@
 import express from "express";
 
 import {
-    getAdminProjectDetails
+    getAdminProjectDetails,
+    approveAdminProject
 } from "../../controllers/admin/projectController.js";
 
 import {
@@ -16,6 +17,12 @@ router.get(
     authenticateToken,
     requireAdmin,
     getAdminProjectDetails
+);
+router.put(
+    "/:id/approve",
+    authenticateToken,
+    requireAdmin,
+    approveAdminProject
 );
 
 export default router;
