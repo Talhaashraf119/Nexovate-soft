@@ -15,7 +15,16 @@ export const startProjectAndGenerateIds = async (req, res) => {
             milestones = [],
             total_milestones
         } = req.body;
-
+console.log("START PROJECT REQUEST:");
+console.log({
+    projectName,
+    purpose,
+    projectOverview,
+    budget,
+    timeline,
+    milestones,
+    total_milestones
+});
         if (!projectName || !purpose || !projectOverview || !budget) {
             return res.status(400).json({
                 error: 'projectName, purpose, projectOverview, and budget are required.'
